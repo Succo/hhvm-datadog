@@ -53,6 +53,37 @@ class HHVMCheck(AgentCheck):
         self.gauge("hhvm.memory.process_stats.data", resp["Memory"]["Process Stats (bytes)"]["Data"])
         self.gauge("hhvm.memory.process_stats.text", resp["Memory"]["Process Stats (bytes)"]["Text(Code)"])
 
+
+        health_url=  "{}/check-health{}".format(url, auth)
+        try:
+            r = requests.get(health_url)
+        except requests.exceptions.Timeout as e:
+            raise Exception("Timeout when connecting to {}".format(health_url))
+
+        if r.status_code != 200:
+            raise Exception("Invalid response from {}, might be a auth issue, code {}".format(health_url, r.status_code))
+
+        resp = r.json()
+
+        self.gauge("hhvm.load", resp["load"])
+        self.gauge("hhvm.queued", resp["queued"])
+        self.gauge("hhvm.hhbc-roarena-capac", resp["hhbc-roarena-capac"])
+        self.gauge("hhvm.tc-hotsize", resp["tc-hotsize"])
+        self.gauge("hhvm.tc-coldsize", resp["tc-coldsize"])
+        self.gauge("hhvm.tc-frozensize", resp["tc-frozensize"])
+        self.gauge("hhvm.rds", resp["rds"])
+        self.gauge("hhvm.rds-local", resp["rds-local"])
+        self.gauge("hhvm.rds-persistent", resp["rds-persistent"])
+        self.gauge("hhvm.catch-traces", resp["catch-traces"])
+        self.gauge("hhvm.fixups", resp["fixups"])
+        self.gauge("hhvm.units", resp["units"])
+        self.gauge("hhvm.funcs", resp["funcs"])
+        self.gauge("hhvm.request-count", resp["request-count"])
+        self.gauge("hhvm.single-jit-requests", resp["single-jit-requests"])
+        self.gauge("hhvm.prof-funcs", resp["prof-funcs"])
+        self.gauge("hhvm.prof-bc", resp["prof-bc"])
+        self.gauge("hhvm.opt-funcs", resp["opt-funcs"])
+
     def failure_event(self, code, aggregation_key):
         self.event({
             'timestamp' : int(time.time()),
