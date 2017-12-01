@@ -84,6 +84,45 @@ class HHVMCheck(AgentCheck):
         self.gauge("hhvm.prof-bc", resp["prof-bc"])
         self.gauge("hhvm.opt-funcs", resp["opt-funcs"])
 
+        stats_url = "{}/status.json".format(url, auth)
+        try:
+           r = requests.get(stats_url)
+        except requests.exceptions.Timeout as e:
+            raise Exception("Timeout connecting to {}".format(stats_url))
+
+        if r.status_code != 200:
+            raise Exception("Invalid response from {}, might be a auth issue, code {}".format(stats_url, r.status_code))
+
+        resp = r.json()
+        modes = {}
+        ioduration = 0
+        io_on = 0
+        threads = resp["status"]["threads"]
+
+        for thread in threads:
+            if not thread["mode"] in modes:
+                modes[thread["mode"]] = 1
+            else:
+                modes[thread["mode"]] += 1
+            if thread["mode"] != "idle":
+                if thread["io"] == 1:
+                    io_on += 1
+                    ioduration += thread["ioduration"]
+                    self.histogram("hhvm.thread.io.duration", thread["ioduration"])
+            else:
+                self.gauge("hhvm.thread.io.idle", 1)
+
+
+        for mode in modes:
+            print mode
+            metric = "hhvm.thread.mode.{}".format(mode)
+            self.gauge(metric, modes[mode])
+        # this is dump
+        ioduration = ioduration / 1000.0
+        self.count("hhvm.thread.io",  io_on)
+        self.histogram("hhvm.thread.io.total.duration",  ioduration)
+
+
     def failure_event(self, code, aggregation_key):
         self.event({
             'timestamp' : int(time.time()),
